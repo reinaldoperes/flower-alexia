@@ -17,7 +17,7 @@ body {
   min-height: 100vh;
   background-color: var(--dark-color);
   overflow: hidden;
-  perspective: 1000px;
+  position: relative;
 }
 
 .night {
@@ -34,6 +34,8 @@ body {
 .flowers {
   position: relative;
   transform: scale(0.9);
+  perspective: 1000px;
+  transform-style: preserve-3d;
 }
 
 .flower {

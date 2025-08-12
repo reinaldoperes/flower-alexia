@@ -23,6 +23,12 @@ async function ensureGifJs(){
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   let W=0, H=0, stars=[];
 
+  // densidades (ajuste aqui pra “mais/menos estrelas”)
+  const DESKTOP_DENSITY = 220;   // estrelas dinâmicas em 1080p
+  const LITE_DENSITY    = 120;   // idem no modo lite
+  const STATIC_SPRINKLE = 1400;  // estrelas ESTÁTICAS em 1080p
+
+  // heurística de lite (igual à sua)
   const isLite =
     matchMedia('(pointer: coarse)').matches ||
     (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
@@ -31,8 +37,11 @@ async function ensureGifJs(){
 
   if (isLite) document.body.classList.add('lite');
 
+  // offscreen p/ o tapete estático
+  const bg = document.createElement('canvas');
+  let bgDirty = true;
+
   function resize(){
-    // mede pela janela (evita clientWidth=0 do pai transformado)
     W = Math.max(1, window.innerWidth);
     H = Math.max(1, window.innerHeight);
     canvas.width  = Math.floor(W * DPR);
@@ -40,7 +49,11 @@ async function ensureGifJs(){
     canvas.style.width  = W + 'px';
     canvas.style.height = H + 'px';
 
-    buildStars(); // <— RECONSTRÓI no resize
+    // sincroniza o offscreen e reconstrói tudo
+    bg.width  = canvas.width;
+    bg.height = canvas.height;
+    buildBackdrop();
+    buildStars();
   }
 
   const palette = ['#a8c8ff','#ffffff','#fff3c2','#ffd27a','#ffb38a','#ff9b8a'];
@@ -52,16 +65,44 @@ async function ensureGifJs(){
   }
   function rgb(c){ const n = parseInt(c.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 
+  // 1) tapete ESTÁTICO (muitas estrelas baratinhas)
+  function buildBackdrop(){
+    const b = bg.getContext('2d');
+    b.clearRect(0,0,bg.width,bg.height);
+    b.globalCompositeOperation = 'lighter';
+
+    const area = (W*H)/(1920*1080);
+    const count = Math.round(STATIC_SPRINKLE * Math.max(0.6, area));
+
+    for (let i=0;i<count;i++){
+      const layer = Math.random();                    // profundidade visual
+      const [r,g,bch] = rgb(pickColor());
+      const alpha = 0.10 + 0.22*layer;                // bem suaves
+      const radius = Math.max(0.4, (0.35 + Math.random()*0.5) * (0.6 + layer)) * DPR;
+
+      const x = Math.random()*bg.width;
+      const y = Math.random()*bg.height;
+
+      b.beginPath();
+      b.arc(x, y, radius, 0, Math.PI*2);
+      b.fillStyle = `rgba(${r},${g},${bch},${alpha})`;
+      b.fill();
+    }
+
+    b.globalCompositeOperation = 'source-over';
+    bgDirty = false;
+  }
+
+  // 2) estrelas DINÂMICAS (twinkle)
   function buildStars(){
     const area = (W*H)/(1920*1080);
-    const baseDensity = isLite ? 80 : 150; // pode ajustar depois
+    const baseDensity = isLite ? LITE_DENSITY : DESKTOP_DENSITY;
     const count = Math.round(baseDensity * Math.max(0.6, area));
 
     stars = new Array(count).fill(0).map(() => {
       const layer = Math.random(); // 0..1 (longe→perto)
-      // AUMENTEI os tamanhos base e garanti mínimo visível
       const sizePx = (isLite ? 0.9 : 1.1) * (0.4 + Math.pow(Math.random(), 1.4) * 1.3); // ~0.4–2.1
-      const r = Math.max(0.7, sizePx * (0.7 + layer)) * DPR; // >=0.7px
+      const r = Math.max(0.6, sizePx * (0.7 + layer)) * DPR; // >=0.6px
       const col = rgb(pickColor());
       return {
         x: Math.random()*canvas.width,
@@ -79,10 +120,9 @@ async function ensureGifJs(){
   resize();
   addEventListener('resize', resize);
 
-  // estrela cadente (opcional)
+  // estrela cadente (igual à sua)
   let shooting = null;
   let nextShootAt = performance.now() + 4000 + Math.random()*6000;
-
   function maybeSpawnShootingStar(now){
     if (isLite) return;
     if (now < nextShootAt || shooting) return;
@@ -101,9 +141,12 @@ async function ensureGifJs(){
   function step(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Deixa as estrelas mais “vivas” somando luz
-    ctx.globalCompositeOperation = 'lighter';
+    // desenha o tapete estático (1 drawImage — baratíssimo)
+    if (bgDirty) buildBackdrop();
+    ctx.drawImage(bg, 0, 0);
 
+    // estrelas dinâmicas “somando luz”
+    ctx.globalCompositeOperation = 'lighter';
     for (const s of stars){
       s.ph += s.tw * 0.016;
       const tw = 0.6 + 0.4 * Math.sin(s.ph);
@@ -118,6 +161,7 @@ async function ensureGifJs(){
       ctx.fill();
     }
 
+    // estrela cadente
     const now = performance.now();
     maybeSpawnShootingStar(now);
     if (shooting){
@@ -146,9 +190,7 @@ async function ensureGifJs(){
       if (shooting.life <= 0 || shooting.x > canvas.width + trail || shooting.y < -trail) shooting = null;
     }
 
-    // volta pro normal (só por segurança, caso desenhe outras coisas depois)
     ctx.globalCompositeOperation = 'source-over';
-
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -204,10 +246,18 @@ async function recordIntro(seconds = DURATION_SEC){
   const btn = document.getElementById(BTN_ID);
 
   const supportsCapture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
-  const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+  const isiOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+
+  const autoLite =
+  (!isiOS && (   matchMedia('(pointer: coarse)').matches
+              || (navigator.deviceMemory && navigator.deviceMemory <= 4)
+              || Math.min(screen.width, screen.height) <= 420))
+  || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (autoLite) document.body.classList.add('lite');
 
   // Em iOS (ou navegadores sem suporte), mostramos desabilitado com dica
-  if (!supportsCapture || isIOS) {
+  if (!supportsCapture || isiOS) {
     btn.disabled = true;
     btn.title = 'Captura de GIF não suportada neste dispositivo/navegador. Use um desktop (Chrome/Edge).';
   }
