@@ -984,3 +984,71 @@ body {
 .not-loaded * {
   animation-play-state: paused !important;
 }
+
+/* --- Sky: moon & stars --- */
+.night { pointer-events: none; } /* garante que o fundo não captura cliques */
+
+.night .stars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.star {
+  position: absolute;
+  width: var(--size, 0.35vmin);
+  height: var(--size, 0.35vmin);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--c, #fff) 0 40%,
+    color-mix(in srgb, var(--c, #fff) 80%, #fff 20%) 60%,
+    transparent 70%
+  );
+  opacity: var(--opacity, .35);
+  filter: drop-shadow(0 0 .6vmin var(--glow, #ffffff80));
+  animation: twinkle var(--dur, 3s) ease-in-out var(--delay, 0s) infinite;
+  transform: scale(var(--s, 1));
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: .2; transform: scale(var(--s,1)); }
+  50%      { opacity: 1;  transform: scale(calc(var(--s,1)*1.5)); }
+}
+
+.moon {
+  position: absolute;
+  top: 8vmin;
+  right: 10vmin;
+  width: 14vmin;
+  height: 14vmin;
+  border-radius: 50%;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 35% 35%, #ffffff 0%, #eaeff9 45%, #cfd8e6 65%, #b6c1d0 100%);
+  box-shadow:
+    0 0 2.2vmin rgba(255,255,255,.7),
+    0 0 6vmin rgba(120,170,255,.35);
+  animation: moon-float 12s ease-in-out infinite;
+  overflow: hidden;
+}
+
+/* crateras simples usando múltiplos radiais “carimbados” */
+.moon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 25% 30%, rgba(0,0,0,.10) 0 26%, rgba(255,255,255,.12) 27% 40%, transparent 41%) 6% 10%/35% 35% no-repeat,
+    radial-gradient(circle at 65% 55%, rgba(0,0,0,.12) 0 22%, rgba(255,255,255,.10) 23% 38%, transparent 39%) 60% 55%/38% 38% no-repeat,
+    radial-gradient(circle at 55% 25%, rgba(0,0,0,.09) 0 18%, rgba(255,255,255,.12) 19% 34%, transparent 35%) 55% 18%/30% 30% no-repeat,
+    radial-gradient(circle at 40% 70%, rgba(0,0,0,.08) 0 14%, rgba(255,255,255,.10) 15% 28%, transparent 29%) 38% 72%/24% 24% no-repeat;
+  opacity: .6;
+  filter: blur(0.1vmin);
+}
+
+@keyframes moon-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1vmin); }
+}
