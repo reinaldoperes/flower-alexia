@@ -1052,3 +1052,126 @@ body {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-1vmin); }
 }
+
+/* ===== Parallax de estrelas em 3 camadas ===== */
+.night { pointer-events: none; } /* fundo não captura cliques */
+
+.stars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0; /* atrás da lua */
+  will-change: transform;
+}
+
+/* drift horizontal bem sutil; cada camada com período diferente */
+.stars--far  { animation: pan-sky-far  120s ease-in-out infinite alternate; filter: blur(0.20vmin) brightness(0.9); }
+.stars--mid  { animation: pan-sky-mid   90s ease-in-out infinite alternate; filter: blur(0.15vmin) brightness(1.0); }
+.stars--near { animation: pan-sky-near  70s ease-in-out infinite alternate; filter: blur(0.08vmin) brightness(1.05); }
+
+@keyframes pan-sky-far  { 0% { transform: translateX(0)   } 100% { transform: translateX(2.5vmin) } }
+@keyframes pan-sky-mid  { 0% { transform: translateX(0)   } 100% { transform: translateX(4.0vmin) } }
+@keyframes pan-sky-near { 0% { transform: translateX(0)   } 100% { transform: translateX(6.0vmin) } }
+
+/* estrela unitária (cores/tamanhos via CSS vars setadas no JS) */
+.star {
+  position: absolute;
+  width: var(--size, 0.35vmin);
+  height: var(--size, 0.35vmin);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--c, #fff) 0 40%,
+    color-mix(in srgb, var(--c, #fff) 80%, #fff 20%) 60%,
+    transparent 70%
+  );
+  opacity: var(--opacity, .35);
+  filter: drop-shadow(0 0 .6vmin var(--glow, #ffffff80));
+  animation: twinkle var(--dur, 3s) ease-in-out var(--delay, 0s) infinite;
+  transform: scale(var(--s, 1));
+}
+
+/* se não tiver o @keyframes twinkle no seu CSS, mantenha este: */
+@keyframes twinkle {
+  0%, 100% { opacity: .2; transform: scale(var(--s,1)); }
+  50%      { opacity: 1;  transform: scale(calc(var(--s,1)*1.5)); }
+}
+
+/* ===== Estrela cadente ===== */
+.shooting-star {
+  position: absolute;
+  z-index: 1;          /* ainda atrás da lua (que está z-index maior) */
+  left: var(--sx, -10vmin);
+  top:  var(--sy, 20vmin);
+  width: 18vmin;
+  height: .22vmin;
+  color: var(--c, #fff);
+  background: linear-gradient(90deg, rgba(255,255,255,0), currentColor 45%, rgba(255,255,255,0));
+  border-radius: 999px;
+  filter: drop-shadow(0 0 1vmin currentColor);
+  transform: rotate(var(--deg, -35deg));
+  animation: shoot var(--time, 1.2s) linear forwards;
+}
+
+.shooting-star::after {
+  content: "";
+  position: absolute;
+  right: -0.2vmin;
+  top: 50%;
+  width: .6vmin;
+  height: .6vmin;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 0 .8vmin currentColor);
+}
+
+@keyframes shoot {
+  to {
+    left: calc(var(--sx, -10vmin) + 60vmin);
+    top:  calc(var(--sy,  20vmin) - 60vmin);
+    opacity: 0;
+  }
+}
+
+/* Botão discreto p/ capturar GIF */
+.capture-btn{
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 9999;
+  padding: .55rem .7rem;
+  font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color: #0a0a0a;
+  background: rgba(255,255,255,.85);
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  opacity: .35;
+  transition: opacity .2s ease, transform .2s ease, filter .2s ease;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.capture-btn:hover{ opacity: .9; transform: translateY(-1px); }
+.capture-btn:disabled{ opacity:.25; cursor: not-allowed; }
+
+.capture-toast{
+  position: fixed;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%);
+  z-index: 9998;
+  padding: .55rem .8rem;
+  font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color: #0a0a0a;
+  background: rgba(255,255,255,.9);
+  border-radius: 10px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.capture-toast.show{ opacity: 1; transform: translateX(-50%) translateY(-2px); }
+
+/* esconde o botão durante a captura pra não aparecer no GIF */
+body.capturing .capture-btn{ opacity: 0; pointer-events: none; }

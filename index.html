@@ -6,10 +6,17 @@
   <title>Flor da muié</title>
   <link rel="stylesheet" href="styles.css">
   <script src="script.js" defer></script>
+<!-- Botão e toast de status -->
+<button id="captureGifBtn" class="capture-btn" title="Baixar GIF da animação">GIF</button>
+<div id="captureToast" class="capture-toast" aria-live="polite"></div>
 
+<!-- Lib de GIF (worker declarado no JS) -->
+<script src="https://unpkg.com/gif.js@0.2.0/dist/gif.js"></script>
 <body class="not-loaded">
   <div class="night">
-    <div class="stars" aria-hidden="true"></div>
+    <div class="stars stars--far"  aria-hidden="true"></div>
+    <div class="stars stars--mid"  aria-hidden="true"></div>
+    <div class="stars stars--near" aria-hidden="true"></div>
     <div class="moon" aria-hidden="true"></div>
   </div>
   <div class="flowers">
