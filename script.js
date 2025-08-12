@@ -5,110 +5,154 @@ onload = () => {
   }, 1000);
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-  const far  = document.querySelector('.stars--far');
-  const mid  = document.querySelector('.stars--mid');
-  const near = document.querySelector('.stars--near');
-  const night = document.querySelector('.night');
-  if (!far || !mid || !near || !night) return;
+async function ensureGifJs(){
+  if (window.GIF) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/gif.js@0.2.0/dist/gif.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
 
-  // Paleta com pesos (estética)
-  const palette = [
-    { hex: '#a8c8ff', weight: 0.18 }, // azul-branca
-    { hex: '#ffffff', weight: 0.32 }, // branca
-    { hex: '#fff3c2', weight: 0.24 }, // amarelo-branca
-    { hex: '#ffd27a', weight: 0.16 }, // amarela
-    { hex: '#ffb38a', weight: 0.08 }, // laranja
-    { hex: '#ff9b8a', weight: 0.02 }  // avermelhada
-  ];
+(function initStarCanvas(){
+  const canvas = document.getElementById('starfield');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
 
-  function pickColor() {
-    const total = palette.reduce((a, p) => a + p.weight, 0);
-    let r = Math.random() * total;
-    for (const p of palette) {
-      if ((r -= p.weight) <= 0) return p.hex;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  let W=0, H=0, stars=[];
+
+  const isLite =
+    matchMedia('(pointer: coarse)').matches ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+    Math.min(screen.width, screen.height) <= 420 ||
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (isLite) document.body.classList.add('lite');
+
+  function resize(){
+    // mede pela janela (evita clientWidth=0 do pai transformado)
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    buildStars(); // <— RECONSTRÓI no resize
+  }
+
+  const palette = ['#a8c8ff','#ffffff','#fff3c2','#ffd27a','#ffb38a','#ff9b8a'];
+  const weights = [0.18,0.32,0.24,0.16,0.08,0.02];
+  function pickColor(){
+    let r = Math.random(), acc = 0;
+    for (let i=0;i<palette.length;i++){ acc += weights[i]; if (r<=acc) return palette[i]; }
+    return palette[0];
+  }
+  function rgb(c){ const n = parseInt(c.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+  function buildStars(){
+    const area = (W*H)/(1920*1080);
+    const baseDensity = isLite ? 80 : 150; // pode ajustar depois
+    const count = Math.round(baseDensity * Math.max(0.6, area));
+
+    stars = new Array(count).fill(0).map(() => {
+      const layer = Math.random(); // 0..1 (longe→perto)
+      // AUMENTEI os tamanhos base e garanti mínimo visível
+      const sizePx = (isLite ? 0.9 : 1.1) * (0.4 + Math.pow(Math.random(), 1.4) * 1.3); // ~0.4–2.1
+      const r = Math.max(0.7, sizePx * (0.7 + layer)) * DPR; // >=0.7px
+      const col = rgb(pickColor());
+      return {
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        r,
+        c: col,
+        a: 0.28 + 0.6*layer,                   // alpha base um pouco maior
+        tw: (isLite?0.35:0.65) + Math.random()*0.7,
+        ph: Math.random()*Math.PI*2,
+        sp: 0.02 + 0.05*layer
+      };
+    });
+  }
+
+  resize();
+  addEventListener('resize', resize);
+
+  // estrela cadente (opcional)
+  let shooting = null;
+  let nextShootAt = performance.now() + 4000 + Math.random()*6000;
+
+  function maybeSpawnShootingStar(now){
+    if (isLite) return;
+    if (now < nextShootAt || shooting) return;
+    nextShootAt = now + 6000 + Math.random()*8000;
+
+    const startX = -80 * DPR;
+    const startY = (canvas.height * (0.15 + Math.random()*0.6)) | 0;
+    const speed  = (350 + Math.random()*250) * DPR;
+    const angle  = (-35 - Math.random()*12) * Math.PI/180;
+    shooting = {
+      x: startX, y: startY, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+      life: 900, col: rgb(pickColor())
+    };
+  }
+
+  function step(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Deixa as estrelas mais “vivas” somando luz
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (const s of stars){
+      s.ph += s.tw * 0.016;
+      const tw = 0.6 + 0.4 * Math.sin(s.ph);
+      const alpha = s.a * tw;
+
+      s.x += s.sp;
+      if (s.x > canvas.width + 5) s.x = -5;
+
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${s.c[0]},${s.c[1]},${s.c[2]},${Math.min(1, alpha).toFixed(3)})`;
+      ctx.fill();
     }
-    return palette[0].hex;
-  }
 
-  function createStars(container, count, opts) {
-    const {
-      minSize = 0.16,     // em vmin
-      maxSize = 1.00,
-      twinkleMin = 2.5,   // em s
-      twinkleMax = 6.0,
-      opacityBase = 0.22, // 0–1
-      sizeGamma = 1.6     // curva de distribuição (maiores valores = mais estrelas pequenas)
-    } = opts || {};
+    const now = performance.now();
+    maybeSpawnShootingStar(now);
+    if (shooting){
+      const dt = 16;
+      shooting.life -= dt;
+      shooting.x += shooting.vx*(dt/1000);
+      shooting.y += shooting.vy*(dt/1000);
 
-    for (let i = 0; i < count; i++) {
-      const el = document.createElement('span');
-      el.className = 'star';
+      const trail = 120 * DPR, headR = 1.8 * DPR;
+      const [r,g,b] = shooting.col;
 
-      // posição
-      el.style.left = `${Math.random() * 100}vw`;
-      el.style.top  = `${Math.random() * 100}vh`;
+      const ang = Math.atan2(shooting.vy, shooting.vx);
+      ctx.strokeStyle = `rgba(${r},${g},${b},0.75)`;
+      ctx.lineWidth = 0.9 * DPR;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(shooting.x, shooting.y);
+      ctx.lineTo(shooting.x - Math.cos(ang)*trail, shooting.y - Math.sin(ang)*trail);
+      ctx.stroke();
 
-      // tamanho (distribuição enviesada p/ pequenas)
-      const t = Math.pow(Math.random(), sizeGamma);
-      const size = minSize + t * (maxSize - minSize);
-      el.style.setProperty('--size', `${size.toFixed(2)}vmin`);
+      ctx.beginPath();
+      ctx.arc(shooting.x, shooting.y, headR, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.9)`;
+      ctx.fill();
 
-      // cor/glow
-      const color = pickColor();
-      el.style.setProperty('--c', color);
-      el.style.setProperty('--glow', color);
-
-      // opacidade base ajustada pelo tamanho
-      const op = opacityBase + Math.min(size / 1.2, 0.55);
-      el.style.setProperty('--opacity', op.toFixed(2));
-
-      // twinkle
-      const dur = twinkleMin + Math.random() * (twinkleMax - twinkleMin);
-      el.style.setProperty('--dur', `${dur.toFixed(2)}s`);
-      el.style.setProperty('--delay', `${(Math.random() * 3).toFixed(2)}s`);
-      el.style.setProperty('--s', (0.9 + Math.random() * 0.6).toFixed(2));
-
-      container.appendChild(el);
+      if (shooting.life <= 0 || shooting.x > canvas.width + trail || shooting.y < -trail) shooting = null;
     }
+
+    // volta pro normal (só por segurança, caso desenhe outras coisas depois)
+    ctx.globalCompositeOperation = 'source-over';
+
+    requestAnimationFrame(step);
   }
-
-  // Quantidade e perfil por camada
-  createStars(far,  140, { minSize: 0.14, maxSize: 0.42, twinkleMin: 3.5, twinkleMax: 7.0, opacityBase: 0.18, sizeGamma: 1.8 });
-  createStars(mid,  100, { minSize: 0.18, maxSize: 0.70, twinkleMin: 2.8, twinkleMax: 6.0, opacityBase: 0.22, sizeGamma: 1.6 });
-  createStars(near,  70, { minSize: 0.24, maxSize: 1.10, twinkleMin: 2.0, twinkleMax: 4.2, opacityBase: 0.26, sizeGamma: 1.4 });
-
-  /* ===== Estrelas cadentes ocasionais ===== */
-  function spawnShootingStar() {
-    const el = document.createElement('span');
-    el.className = 'shooting-star';
-
-    // spawn entre 10vmin e 70vmin de altura
-    const sy = 10 + Math.random() * 60;
-    el.style.setProperty('--sx', `${-12 + Math.random() * 6}vmin`); // um pouco antes da borda esquerda
-    el.style.setProperty('--sy', `${sy}vmin`);
-
-    // duração e ângulo
-    el.style.setProperty('--time', `${(0.9 + Math.random() * 1.2).toFixed(2)}s`);
-    el.style.setProperty('--deg', `${-30 - Math.random() * 12}deg`);
-
-    // cor
-    el.style.setProperty('--c', pickColor());
-
-    night.appendChild(el);
-    el.addEventListener('animationend', () => el.remove());
-  }
-
-  // loop com jitter — média ~1 estrela a cada 6–10s
-  (function shootingLoop() {
-    const nextIn = 4000 + Math.random() * 6000; // 4–10s
-    setTimeout(() => {
-      // 65% de chance de realmente spawnar neste tick
-      if (Math.random() < 0.65) spawnShootingStar();
-      shootingLoop();
-    }, nextIn);
-  })();
-});
+  requestAnimationFrame(step);
+})();
 
 async function recordIntro(seconds = DURATION_SEC){
   // pausa tudo para reiniciar no frame 0
@@ -156,9 +200,16 @@ async function recordIntro(seconds = DURATION_SEC){
   const MAX_WIDTH = 720;          // limita largura do GIF
   const FPS = 12;                 // frames/seg no GIF
   const DURATION_SEC = 6;         // duração gravada
-  const WORKER_URL = 'https://unpkg.com/gif.js@0.2.0/dist/gif.worker.js';
 
   const btn = document.getElementById(BTN_ID);
+
+  const supportsCapture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!supportsCapture || isMobile) {
+    // sem captura no mobile — só esconde o botão
+    btn.style.display = 'none';
+  }
+
   const toast = document.getElementById(TOAST_ID);
   if (!btn || !toast) return;
 
@@ -180,41 +231,6 @@ async function recordIntro(seconds = DURATION_SEC){
       URL.revokeObjectURL(a.href);
       a.remove();
     }, 0);
-  }
-
-  async function recordTab(seconds = DURATION_SEC){
-    // pede permissão pra capturar a ABA atual
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        frameRate: { ideal: 30, max: 60 },
-        // dicas p/ Chrome escolher a aba atual (ignorados em outros)
-        displaySurface: 'browser',
-        cursor: 'never'
-      },
-      audio: false
-    });
-
-    return new Promise((resolve, reject) => {
-      const chunks = [];
-      const mimeOptions = [
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=vp8',
-        'video/webm'
-      ];
-      let rec = null;
-      for (const t of mimeOptions) {
-        if (MediaRecorder.isTypeSupported(t)) { rec = new MediaRecorder(stream, { mimeType: t, videoBitsPerSecond: 4_000_000 }); break; }
-      }
-      if (!rec) { stream.getTracks().forEach(t => t.stop()); reject(new Error('MediaRecorder não suportado')); return; }
-
-      const stopAll = () => stream.getTracks().forEach(t => t.stop());
-
-      const timer = setTimeout(() => { try { rec.stop(); } catch(_){} }, seconds * 1000);
-      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onstop = () => { clearTimeout(timer); stopAll(); resolve(new Blob(chunks, { type: chunks[0]?.type || 'video/webm' })); };
-      rec.onerror = (e) => { clearTimeout(timer); stopAll(); reject(e.error || e.name || e); };
-      rec.start(100); // fragmenta ~100ms
-    });
   }
 
   // Substitua as constantes do worker por esta versão:
@@ -317,6 +333,8 @@ async function recordIntro(seconds = DURATION_SEC){
   }
 
   btn.addEventListener('click', async () => {
+    await ensureGifJs();
+
     btn.disabled = true;
     document.body.classList.add('capturing');
     showToast('Gravando animação...');

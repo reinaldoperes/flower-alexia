@@ -1175,3 +1175,57 @@ body {
 
 /* esconde o botão durante a captura pra não aparecer no GIF */
 body.capturing .capture-btn{ opacity: 0; pointer-events: none; }
+
+/* Canvas de estrelas (substitui os .stars em DOM) */
+#starfield{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;           /* atrás da lua */
+  pointer-events: none;
+}
+
+/* Se ainda existirem as camadas .stars, esconda-as */
+.stars{ display: none !important; }
+
+/* Modo lite: corta animações “cosméticas” pesadas */
+body.lite .flower__light{ display:none !important; }            /* apaga os 24 vaga-lumes */
+body.lite .flower__g-right,
+body.lite .flower__g-front,
+body.lite .flower__g-fr,
+body.lite .long-g .leaf{ animation: none !important; }          /* menos balanço de folhas */
+body.lite .night{ filter:none !important; }                      /* tira blur do fundo */
+body.lite .flower{ animation-duration: 6s; }                     /* menos oscilação */
+
+/* Botão: respeitar safe-area no mobile e garantir z-index */
+.capture-btn{
+  bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+  z-index: 9999;
+}
+
+/* camadas do céu */
+.night{
+  position: fixed;
+  inset: 0;
+  z-index: 0;           /* fundo */
+  /* mantém seu background + blur como já estava definido antes */
+}
+
+#starfield{
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;           /* acima do fundo, abaixo da lua e das flores */
+  pointer-events: none;
+}
+
+.moon{
+  position: fixed;      /* antes era absolute dentro da .night */
+  top: 8vmin;
+  right: 10vmin;
+  z-index: 2;
+}
