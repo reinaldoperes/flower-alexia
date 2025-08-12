@@ -1178,12 +1178,12 @@ body.capturing .capture-btn{ opacity: 0; pointer-events: none; }
 
 /* Canvas de estrelas (substitui os .stars em DOM) */
 #starfield{
-  position: absolute;
+  position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  z-index: 0;           /* atrás da lua */
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -1209,18 +1209,12 @@ body.lite .flower{ animation-duration: 6s; }                     /* menos oscila
 .night{
   position: fixed;
   inset: 0;
-  z-index: 0;           /* fundo */
-  /* mantém seu background + blur como já estava definido antes */
-}
-
-#starfield{
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  z-index: 1;           /* acima do fundo, abaixo da lua e das flores */
-  pointer-events: none;
+  z-index: 0;
+  filter: blur(0.1vmin);
+  background-image:
+    radial-gradient(ellipse at top, rgba(0,0,0,0) 0%, #000 60%),
+    radial-gradient(ellipse at bottom, #000 0%, rgba(0,0,0,0) 40%),
+    linear-gradient(180deg, #000 0%, #06080c 100%);
 }
 
 .moon{
@@ -1229,3 +1223,37 @@ body.lite .flower{ animation-duration: 6s; }                     /* menos oscila
   right: 10vmin;
   z-index: 2;
 }
+
+/* Botão GIF desabilitado continua visível (não esconder em mobile) */
+.capture-btn[disabled]{
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* Toggle de performance */
+.perf-btn{
+  position: fixed;
+  left: 1.2rem;
+  bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+  z-index: 9999;
+  padding: .45rem .7rem;
+  font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color: #0a0a0a;
+  background: rgba(255,255,255,.85);
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  backdrop-filter: blur(6px);
+  opacity: .6;
+  transition: transform .2s ease, opacity .2s ease;
+}
+.perf-btn:hover{ opacity: 1; transform: translateY(-1px); }
+
+/* Modo lite (já existia, mantemos) */
+body.lite .flower__light{ display:none !important; }
+body.lite .flower__g-right,
+body.lite .flower__g-front,
+body.lite .flower__g-fr,
+body.lite .long-g .leaf{ animation: none !important; }
+body.lite .night{ filter:none !important; }
+body.lite .flower{ animation-duration: 6s; }

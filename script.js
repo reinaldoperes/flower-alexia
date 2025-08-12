@@ -204,10 +204,12 @@ async function recordIntro(seconds = DURATION_SEC){
   const btn = document.getElementById(BTN_ID);
 
   const supportsCapture = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (!supportsCapture || isMobile) {
-    // sem captura no mobile — só esconde o botão
-    btn.style.display = 'none';
+  const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+
+  // Em iOS (ou navegadores sem suporte), mostramos desabilitado com dica
+  if (!supportsCapture || isIOS) {
+    btn.disabled = true;
+    btn.title = 'Captura de GIF não suportada neste dispositivo/navegador. Use um desktop (Chrome/Edge).';
   }
 
   const toast = document.getElementById(TOAST_ID);
@@ -354,5 +356,30 @@ async function recordIntro(seconds = DURATION_SEC){
       btn.disabled = false;
       document.body.classList.remove('capturing');
     }
+  });
+})();
+
+(function(){
+  const perfBtn = document.getElementById('perfToggle');
+  if (!perfBtn) return;
+
+  // estado inicial: respeita localStorage, senão heurística já aplicou
+  const saved = localStorage.getItem('pref-mode'); // 'lite' | 'full' | null
+  if (saved === 'lite') document.body.classList.add('lite');
+  if (saved === 'full') document.body.classList.remove('lite');
+
+  function refreshLabel(){
+    const lite = document.body.classList.contains('lite');
+    perfBtn.setAttribute('aria-pressed', lite ? 'true' : 'false');
+    perfBtn.textContent = lite ? '⚡ Lite' : '✨ Full';
+    perfBtn.title = lite ? 'Desativar modo leve' : 'Ativar modo leve';
+  }
+  refreshLabel();
+
+  perfBtn.addEventListener('click', () => {
+    const nowLite = !document.body.classList.contains('lite');
+    document.body.classList.toggle('lite', nowLite);
+    localStorage.setItem('pref-mode', nowLite ? 'lite' : 'full');
+    refreshLabel();
   });
 })();
